@@ -1,0 +1,17 @@
+body {
+  font-family: system-ui, sans-serif;
+  background: #0f0f0f;
+  color: #fff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  margin: 0;
+  padding: 1rem;
+}
+#app {
+  text-align: center;
+}
+h1 {
+  margin-bottom: 0.5rem;
+}
