@@ -1,4 +1,4 @@
-import { app, auth, db } from "./firebase.js";
+import { app, auth, db, analytics } from "./firebase.js";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -8,23 +8,45 @@ import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
-  collection,
-  onSnapshot
+  doc, getDoc, setDoc, serverTimestamp, collection, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import {
+  logEvent,
+  setUserId,
+  setUserProperties
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
 
 const googleProvider = new GoogleAuthProvider();
 const appDiv = document.getElementById("app");
 
+// 🔥 Turn on Analytics debug mode (so we can test in real-time)
+// Remove this line once you're done testing.
+window.localStorage.setItem("debug_mode", "true");
+
+// ---------- ANALYTICS HELPERS ----------
+function track(name, params = {}) {
+  try {
+    logEvent(analytics, name, params);
+    console.log("📊 Event:", name, params);
+  } catch (err) {
+    console.warn("Analytics error:", err);
+  }
+}
+
+// Track initial page view
+track("page_view", {
+  page_title: "Firebase Academy",
+  page_location: window.location.href
+});
+
+// ---------- ERROR HELPERS ----------
 function showError(msg) {
   const el = document.getElementById("error");
   if (el) el.textContent = msg;
   else alert(msg);
 }
 
+// ---------- USER PROFILE ----------
 async function ensureUserProfile(user) {
   try {
     const ref = doc(db, "users", user.uid);
@@ -42,6 +64,7 @@ async function ensureUserProfile(user) {
   }
 }
 
+// ---------- UI ----------
 function renderLoggedOut() {
   appDiv.innerHTML = `
     <h1>🔥 Firebase Academy</h1>
@@ -73,19 +96,21 @@ function renderLoggedIn(user) {
       <ul id="lessonList"><li class="muted">Loading…</li></ul>
     </div>
   `;
-  document.getElementById("logoutBtn").onclick = () => signOut(auth);
+  document.getElementById("logoutBtn").onclick = async () => {
+    track("logout");
+    setUserId(analytics, null);   // detach user
+    await signOut(auth);
+  };
   loadProfile(user.uid);
   watchLessons();
 }
 
 async function loadProfile(uid) {
   try {
-    const ref = doc(db, "users", uid);
-    const snap = await getDoc(ref);
+    const snap = await getDoc(doc(db, "users", uid));
+    if (!snap.exists()) return;
     const nameEl = document.getElementById("welcomeName");
-    if (snap.exists() && nameEl) {
-      nameEl.textContent = snap.data().displayName;
-    }
+    if (nameEl) nameEl.textContent = snap.data().displayName || "user";
   } catch (err) {
     console.error(err);
   }
@@ -94,6 +119,7 @@ async function loadProfile(uid) {
 function watchLessons() {
   const listEl = document.getElementById("lessonList");
   if (!listEl) return;
+
   onSnapshot(collection(db, "lessons"), (snapshot) => {
     if (snapshot.empty) {
       listEl.innerHTML = `<li class="muted">No lessons yet.</li>`;
@@ -101,22 +127,32 @@ function watchLessons() {
     }
     listEl.innerHTML = "";
     snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
       const li = document.createElement("li");
-      li.textContent = docSnap.data().title || "(untitled)";
+      li.textContent = data.title || "(untitled)";
+      li.style.cursor = "pointer";
+      li.onclick = () => {
+        track("lesson_view", {
+          lesson_id: docSnap.id,
+          lesson_title: data.title || "(untitled)"
+        });
+        alert("📊 Logged: opened '" + (data.title || "lesson") + "'");
+      };
       listEl.appendChild(li);
     });
-  }, (err) => {
-    console.error("Lessons error:", err);
-  });
+  }, (err) => console.error("Lessons error:", err));
 }
 
+// ---------- AUTH ACTIONS ----------
 async function handleSignUp() {
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
   try {
     await createUserWithEmailAndPassword(auth, email, password);
+    track("sign_up", { method: "email" });
   } catch (err) {
     showError(err.message);
+    track("sign_up_error", { error: err.code || "unknown" });
   }
 }
 
@@ -125,21 +161,32 @@ async function handleLogin() {
   const password = document.getElementById("password").value;
   try {
     await signInWithEmailAndPassword(auth, email, password);
+    track("login", { method: "email" });
   } catch (err) {
     showError(err.message);
+    track("login_error", { error: err.code || "unknown" });
   }
 }
 
 async function handleGoogle() {
   try {
     await signInWithPopup(auth, googleProvider);
+    track("login", { method: "google" });
   } catch (err) {
     showError(err.message);
   }
 }
 
+// ---------- AUTH STATE ----------
 onAuthStateChanged(auth, async (user) => {
   if (user) {
+    // Link all future events to this user
+    setUserId(analytics, user.uid);
+    setUserProperties(analytics, {
+      email_domain: user.email.split("@")[1] || "unknown",
+      provider: user.providerData[0]?.providerId || "unknown"
+    });
+
     await ensureUserProfile(user);
     renderLoggedIn(user);
   } else {
