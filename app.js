@@ -1,4 +1,3 @@
-// app.js
 import { app, auth, db } from "./firebase.js";
 import {
   createUserWithEmailAndPassword,
@@ -20,31 +19,28 @@ import {
 const googleProvider = new GoogleAuthProvider();
 const appDiv = document.getElementById("app");
 
-// ---------- HELPERS ----------
-
 function showError(msg) {
   const el = document.getElementById("error");
   if (el) el.textContent = msg;
   else alert(msg);
 }
 
-// Save or update the user's profile document
 async function ensureUserProfile(user) {
-  const ref = doc(db, "users", user.uid);
-  const snap = await getDoc(ref);
-
-  if (!snap.exists()) {
-    await setDoc(ref, {
-      email: user.email,
-      displayName: user.displayName || user.email.split("@")[0],
-      photoURL: user.photoURL || null,
-      createdAt: serverTimestamp()
-    });
-    console.log("Profile created for", user.uid);
+  try {
+    const ref = doc(db, "users", user.uid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      await setDoc(ref, {
+        email: user.email,
+        displayName: user.displayName || user.email.split("@")[0],
+        photoURL: user.photoURL || null,
+        createdAt: serverTimestamp()
+      });
+    }
+  } catch (err) {
+    alert("Profile error: " + err.message);
   }
 }
-
-// ---------- UI ----------
 
 function renderLoggedOut() {
   appDiv.innerHTML = `
@@ -78,44 +74,41 @@ function renderLoggedIn(user) {
     </div>
   `;
   document.getElementById("logoutBtn").onclick = () => signOut(auth);
-
-  // Fill in the display name from Firestore
   loadProfile(user.uid);
-
-  // Live lessons list
   watchLessons();
 }
 
 async function loadProfile(uid) {
-  const ref = doc(db, "users", uid);
-  const snap = await getDoc(ref);
-  const nameEl = document.getElementById("welcomeName");
-  if (snap.exists() && nameEl) {
-    nameEl.textContent = snap.data().displayName;
+  try {
+    const ref = doc(db, "users", uid);
+    const snap = await getDoc(ref);
+    const nameEl = document.getElementById("welcomeName");
+    if (snap.exists() && nameEl) {
+      nameEl.textContent = snap.data().displayName;
+    }
+  } catch (err) {
+    console.error(err);
   }
 }
 
 function watchLessons() {
   const listEl = document.getElementById("lessonList");
   if (!listEl) return;
-
-  const col = collection(db, "lessons");
-  onSnapshot(col, (snapshot) => {
+  onSnapshot(collection(db, "lessons"), (snapshot) => {
     if (snapshot.empty) {
-      listEl.innerHTML = `<li class="muted">No lessons yet. Add some in Firebase Console!</li>`;
+      listEl.innerHTML = `<li class="muted">No lessons yet.</li>`;
       return;
     }
     listEl.innerHTML = "";
     snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
       const li = document.createElement("li");
-      li.textContent = data.title || "(untitled)";
+      li.textContent = docSnap.data().title || "(untitled)";
       listEl.appendChild(li);
     });
+  }, (err) => {
+    console.error("Lessons error:", err);
   });
 }
-
-// ---------- AUTH ACTIONS ----------
 
 async function handleSignUp() {
   const email = document.getElementById("email").value.trim();
@@ -145,19 +138,11 @@ async function handleGoogle() {
   }
 }
 
-// ---------- AUTH STATE OBSERVER ----------
-
 onAuthStateChanged(auth, async (user) => {
   if (user) {
-    try {
-      await ensureUserProfile(user);
-    } catch (err) {
-      console.error("Profile error:", err);
-    }
+    await ensureUserProfile(user);
     renderLoggedIn(user);
   } else {
     renderLoggedOut();
   }
 });
-
-console.log("Firebase app:", app.name);
