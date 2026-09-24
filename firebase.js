@@ -2,6 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
+import { getMessaging, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDcAa3lAITasot_HHODfNhdnrQbqNQVgUE",
@@ -16,4 +17,18 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const analytics = getAnalytics(app);   // 👈 NEW
+export const analytics = getAnalytics(app);
+
+// VAPID key — paste yours here
+export const VAPID_KEY = "BFmyUmwgr0ylXTgJt8YkdAkovnPCFkFtrhpkRJZSe2CG9IgxuMYq0MqJZkxaE44YwmFgVJwAkn4NjIHDXqIzIKc";
+
+// Messaging is only available in some browsers
+export let messaging = null;
+isSupported().then((supported) => {
+  if (supported) {
+    messaging = getMessaging(app);
+    console.log("✅ FCM supported");
+  } else {
+    console.warn("❌ FCM not supported in this browser");
+  }
+});
