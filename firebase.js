@@ -3,6 +3,9 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-aut
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
 import { getMessaging, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
+// add these imports at the top
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyDcAa3lAITasot_HHODfNhdnrQbqNQVgUE",
@@ -31,4 +34,10 @@ isSupported().then((supported) => {
   } else {
     console.warn("❌ FCM not supported in this browser");
   }
+});
+
+// add this AFTER export const app = initializeApp(firebaseConfig);
+export const appCheck = initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider("6LfnGcwtAAAAAIXMu1jG8cMfjNMrruSCIdJ7GA4p"),
+  isTokenAutoRefreshEnabled: true
 });
