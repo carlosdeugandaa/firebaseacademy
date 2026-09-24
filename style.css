@@ -87,3 +87,12 @@ button.danger {
   margin: 0;
   min-height: 1.2em;
   }
+
+#lessonList li {
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+#lessonList li:hover {
+  background: #262626;
+  }
